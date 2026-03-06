@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Family Budget Pro Max V4.1</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    
+    <style>
+        :root {
+            --primary: #4361ee; --secondary: #3f37c9; --success: #4cc9f0; --danger: #f72585;
+            --bg: #f8f9fa; --card: #ffffff; --text: #2b2d42; --border: #eeeeee;
+        }
+        body.dark-mode { --bg: #121212; --card: #1e1e1e; --text: #e0e0e0; --border: #333333; }
+        
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Poppins', sans-serif; transition: background 0.3s; }
+        
+        /* SCROLLING FIXED HERE */
+        html, body { height: 100%; width: 100%; overflow: hidden; background-color: var(--bg); color: var(--text); }
+
+        .view { 
+            display: none; 
+            height: 100vh; /* Full viewport height */
+            width: 100%; 
+            padding: 20px 15px 100px 15px; /* Bottom padding to clear Nav bar */
+            overflow-y: scroll; /* Force vertical scroll */
+            -webkit-overflow-scrolling: touch; /* Smooth scroll for iOS */
+            flex-direction: column;
+        }
+        .view.active { display: flex; }
+
+        /* Hide scrollbar for clean look but keep functionality */
+        .view::-webkit-scrollbar { width: 0px; background: transparent; }
+
+        .card { background: var(--card); padding: 15px; border-radius: 22px; margin-bottom: 15px; border: 1px solid var(--border); box-shadow: 0 4px 12px rgba(0,0,0,0.05); flex-shrink: 0; }
+        
+        .btn { background: var(--primary); color: white; border: none; padding: 12px; border-radius: 12px; cursor: pointer; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; flex-shrink: 0; }
+        
+        .input-group { margin-bottom: 12px; flex-shrink: 0; }
+        .input-group input, .input-group select { width: 100%; padding: 12px; border-radius: 10px; border: 1px solid var(--border); background: var(--bg); color: var(--text); outline: none; }
+
+        /* Animation */
+        .symbol-container { width: 50px; height: 40px; font-size: 28px; display: flex; align-items: center; justify-content: center; }
+        .run-anim { animation: runEffect 1.2s infinite linear; display: inline-block; }
+        @keyframes runEffect {
+            0% { transform: translateX(-3px) skewX(5deg); }
+            50% { transform: translateX(3px) translateY(-2px) skewX(-5deg); }
+            100% { transform: translateX(-3px) skewX(5deg); }
+        }
+
+        .avatar { width: 45px; height: 45px; border-radius: 50%; object-fit: cover; border: 2px solid var(--primary); }
+        
+        /* Nav Fixed at Bottom */
+        .bottom-nav { position: fixed; bottom: 0; width: 100%; height: 70px; background: var(--card); display: flex; justify-content: space-around; align-items: center; border-top: 1px solid var(--border); z-index: 2000; padding-bottom: env(safe-area-inset-bottom); }
+        .nav-item { text-align: center; color: #8d99ae; font-size: 10px; cursor: pointer; flex: 1; }
+        .nav-item.active { color: var(--primary); font-weight: bold; }
+        .nav-item i { font-size: 20px; display: block; margin-bottom: 4px; }
+
+        /* Modals Scrolling */
+        .modal { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); z-index:4000; align-items:center; justify-content:center; padding: 20px; }
+        .modal-content { background: var(--card); width: 100%; max-width: 450px; border-radius: 25px; padding: 25px; max-height: 85vh; overflow-y: auto; position: relative; }
+        
+        .private-badge { background: #ffe5ec; color: #f72585; font-size: 10px; padding: 2px 6px; border-radius: 5px; margin-left: 5px; }
+        .history-item { display: flex; justify-content: space-between; align-items: center; padding: 12px; border-bottom: 1px solid var(--border); }
+    </style>
+</head>
+<body>
+
+    <div id="auth-screen" style="position:fixed; top:0; left:0; width:100%; height:100%; background:var(--bg); z-index:5000; display:flex; align-items:center; justify-content:center;">
+        <div class="card" style="width: 90%; max-width: 400px; text-align: center;">
+            <h2 style="color:var(--primary);">Family Budget</h2>
+            <div id="signup-fields" style="display:none;">
+                <div style="width: 80px; height: 80px; border-radius: 50%; background: #eee; margin: 10px auto; overflow: hidden; cursor: pointer; border: 2px dashed var(--primary);" onclick="document.getElementById('profile-file').click()">
+                    <img id="preview-img" style="width:100%; height:100%; object-fit:cover; display:none;">
+                    <i class="fas fa-camera" id="camera-icon" style="line-height:80px; color:var(--primary);"></i>
+                </div>
+                <input type="file" id="profile-file" hidden accept="image/*" onchange="previewImage(this)">
+                <input type="text" id="reg-name" placeholder="Apka Naam" class="input-group">
+            </div>
+            <div class="input-group"><input type="text" id="auth-phone" placeholder="Phone Number"></div>
+            <div class="input-group"><input type="password" id="auth-pass" placeholder="Password"></div>
+            <button class="btn" onclick="handleAuth()">Login / Signup</button>
+            <p style="margin-top:15px; font-size:12px; color:var(--primary); cursor:pointer" onclick="toggleAuthMode()" id="auth-link">Naya Account Banayein</p>
+        </div>
+    </div>
+
+    <div id="view-dashboard" class="view active">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-shrink:0;">
+            <h3>📊 Dashboard</h3>
+            <div style="display: flex; gap: 20px; align-items: center;">
+                <i class="fas fa-users" style="font-size: 22px; color: var(--primary); cursor: pointer;" onclick="openFamilyModal()"></i>
+                <i class="fas fa-moon" id="dark-btn" style="font-size: 22px; cursor: pointer;" onclick="toggleDarkMode()"></i>
+            </div>
+        </div>
+        
+        <div id="pdf-content">
+            <div class="card" style="background: linear-gradient(135deg, var(--primary), var(--secondary)); color: white; text-align:center;">
+                <small>Family Monthly Spend</small>
+                <h1 id="total-monthly-spend">₹ 0</h1>
+            </div>
+            <h4>Running Rankings</h4>
+            <div id="ranking-list"></div>
+            <div class="card"><canvas id="budgetChart" height="200"></canvas></div>
+        </div>
+        <button class="btn" onclick="exportPDF()" style="background:var(--success);"><i class="fas fa-file-pdf"></i> Download Report</button>
+    </div>
+
+    <div id="view-entry" class="view">
+        <h3>💸 Add & History</h3>
+        <div class="card">
+            <input type="text" id="exp-name" placeholder="Item Name" class="input-group">
+            <input type="number" id="exp-amount" placeholder="Amount (₹)" class="input-group">
+            <div style="display:flex; gap:10px;">
+                <select id="exp-cat" style="flex:1; padding:10px; border-radius:10px;">
+                    <option value="Grocery">🛒 Grocery</option><option value="Bills">⚡ Bills</option>
+                    <option value="Health">💊 Health</option><option value="Travel">🚗 Travel</option>
+                    <option value="Other">📦 Other</option>
+                </select>
+                <select id="exp-private" style="flex:1; padding:10px; border-radius:10px;"><option value="false">Public</option><option value="true">Private</option></select>
+            </div>
+            <button class="btn" style="margin-top:10px;" onclick="saveExpense()">Add Entry</button>
+        </div>
+        <h4>Transaction History</h4>
+        <div id="expense-history"></div>
+    </div>
+
+    <div id="view-tasks" class="view">
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-shrink:0;">
+            <h3>📋 Task Lists</h3>
+            <button onclick="document.getElementById('list-modal').style.display='flex'" class="btn" style="width:auto; padding:5px 15px;">+ New</button>
+        </div>
+        <div id="task-list-container" style="margin-top:15px;"></div>
+    </div>
+
+    <div id="view-profile" class="view">
+        <h3>👤 Profile</h3>
+        <div class="card" style="text-align: center;">
+            <img id="prof-img" class="avatar" style="width:100px; height:100px; margin-bottom:15px;">
+            <h2 id="prof-disp-name">User Name</h2>
+            <p id="prof-disp-code" style="color:var(--primary); font-weight:bold; margin-top:5px;"></p>
+            <div style="margin-top:20px; border-top: 1px solid var(--border); padding-top:20px;">
+                <button class="btn" style="background:var(--danger);" onclick="logout()">Logout</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="list-modal" class="modal">
+        <div class="modal-content">
+            <span style="position:absolute; right:20px; top:20px; cursor:pointer;" onclick="closeListModal()">✖</span>
+            <h4>Create Shopping List</h4>
+            <div id="temp-items" style="margin:10px 0; font-size:12px; color:var(--primary);"></div>
+            <input type="text" id="t-name" placeholder="Item Name" class="input-group">
+            <input type="text" id="t-qty" placeholder="Qty (e.g. 1kg)" class="input-group">
+            <select id="t-private" class="input-group"><option value="false">Public</option><option value="true">Private</option></select>
+            <button class="btn" style="background:#666;" onclick="addToTemp()">+ Add Item</button>
+            <hr style="margin:15px 0; opacity:0.1;">
+            <button class="btn" onclick="shareList('all')">Broadcast to Family</button>
+            <button class="btn" style="margin-top:10px; background:var(--secondary);" onclick="showUserSelection()">Send to Specific User</button>
+            <div id="user-selection" style="display:none; margin-top:15px; border-top:1px solid #eee; padding-top:10px;">
+                <h6>Select User:</h6>
+                <div id="select-user-list"></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="family-modal" class="modal">
+        <div class="modal-content">
+            <span style="position:absolute; right:20px; top:20px; cursor:pointer;" onclick="document.getElementById('family-modal').style.display='none'">✖</span>
+            <h4>Family Members</h4>
+            <div style="display:flex; gap:5px; margin:15px 0;">
+                <input type="text" id="invite-code" placeholder="Enter Code" style="flex:1; padding:10px; border-radius:8px; border:1px solid #ddd;">
+                <button class="btn" style="width:auto;" onclick="sendInvite()">Invite</button>
+            </div>
+            <div id="pending-invites"></div>
+            <hr style="margin:15px 0;">
+            <div id="connected-members"></div>
+        </div>
+    </div>
+
+    <nav class="bottom-nav">
+        <div class="nav-item active" onclick="switchView('dashboard', this)"><i class="fas fa-home"></i>Home</div>
+        <div class="nav-item" onclick="switchView('entry', this)"><i class="fas fa-history"></i>History</div>
+        <div class="nav-item" onclick="switchView('tasks', this)"><i class="fas fa-shopping-cart"></i>Lists</div>
+        <div class="nav-item" onclick="switchView('profile', this)"><i class="fas fa-user"></i>User</div>
+    </nav>
+
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyCikJiVhp8kq5iSzyktKip-19TDBth2BLg",
+            authDomain: "familybudgetapp-7cd6f.firebaseapp.com",
+            projectId: "familybudgetapp-7cd6f",
+            storageBucket: "familybudgetapp-7cd6f.firebasestorage.app",
+            messagingSenderId: "716849659548",
+            appId: "1:716849659548:web:915bf1de4669b386ea3759",
+            databaseURL: "https://familybudgetapp-7cd6f-default-rtdb.firebaseio.com"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth(), db = firebase.database();
+        let currentUser = null, userData = {}, isSignUp = false, myChart = null, tempItems = [], base64Pic = "";
+
+        // --- CORE UI LOGIC ---
+        function switchView(id, el) {
+            document.querySelectorAll('.view').forEach(v => {
+                v.classList.remove('active');
+                v.scrollTo(0,0); // Reset scroll on switch
+            });
+            document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+            document.getElementById('view-'+id).classList.add('active');
+            el.classList.add('active');
+        }
+
+        function toggleDarkMode() {
+            document.body.classList.toggle('dark-mode');
+            localStorage.setItem('f_theme', document.body.classList.contains('dark-mode') ? 'dark' : 'light');
+        }
+        if(localStorage.getItem('f_theme') === 'dark') toggleDarkMode();
+
+        // --- AUTH ---
+        function toggleAuthMode() { isSignUp = !isSignUp; document.getElementById('signup-fields').style.display = isSignUp ? 'block' : 'none'; }
+        function previewImage(input) {
+            if (input.files && input.files[0]) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    document.getElementById('preview-img').src = e.target.result;
+                    document.getElementById('preview-img').style.display = 'block';
+                    document.getElementById('camera-icon').style.display = 'none';
+                    base64Pic = e.target.result;
+                };
+                reader.readAsDataURL(input.files[0]);
+            }
+        }
+        async function handleAuth() {
+            const p = document.getElementById('auth-phone').value, ps = document.getElementById('auth-pass').value;
+            const e = p + "@familyapp.com";
+            try {
+                if(isSignUp) {
+                    const res = await auth.createUserWithEmailAndPassword(e, ps);
+                    const code = Math.random().toString(36).substring(2,8).toUpperCase();
+                    await db.ref('users/'+res.user.uid).set({ uid:res.user.uid, name:document.getElementById('reg-name').value, phone:p, familyId:res.user.uid, familyCode:code, dp: base64Pic || '' });
+                } else await auth.signInWithEmailAndPassword(e, ps);
+            } catch(err) { alert(err.message); }
+        }
+        auth.onAuthStateChanged(user => { if(user) { currentUser=user; document.getElementById('auth-screen').style.display='none'; init(); } else document.getElementById('auth-screen').style.display='flex'; });
+
+        // --- APP LOGIC ---
+        function init() {
+            db.ref('users/'+currentUser.uid).on('value', snap => {
+                userData = snap.val(); if(!userData) return;
+                document.getElementById('prof-img').src = userData.dp || 'https://via.placeholder.com/100';
+                document.getElementById('prof-disp-name').innerText = userData.name;
+                document.getElementById('prof-disp-code').innerText = "FAM CODE: " + userData.familyCode;
+                sync();
+            });
+        }
+
+        function sync() {
+            db.ref('expenses').orderByChild('familyId').equalTo(userData.familyId).on('value', snap => {
+                const data = Object.values(snap.val() || {});
+                renderDashboard(data);
+                renderHistory(data);
+            });
+            db.ref('tasks').orderByChild('familyId').equalTo(userData.familyId).on('value', snap => renderTasks(snap.val() || {}));
+        }
+
+        function renderDashboard(exps) {
+            let total = 0; const userSpends = {}; const cats = {};
+            exps.forEach(e => {
+                const amt = parseFloat(e.amount); total += amt;
+                userSpends[e.userId] = (userSpends[e.userId] || 0) + amt;
+                const cName = (e.isPrivate && e.userId !== currentUser.uid && e.buyerId !== currentUser.uid) ? "Private" : e.category;
+                cats[cName] = (cats[cName] || 0) + amt;
+            });
+            document.getElementById('total-monthly-spend').innerText = "₹ " + total.toLocaleString();
+            
+            db.ref('users').once('value', uSnap => {
+                const users = uSnap.val();
+                const sorted = Object.entries(userSpends).sort((a,b)=>b[1]-a[1]);
+                const syms = ['🐂','🐎','🦁','🐇','🐢'];
+                let h = "";
+                sorted.forEach(([uid, amt], i) => {
+                    const u = users[uid];
+                    h += `<div class="card" style="display:flex; align-items:center; gap:12px; padding:10px;">
+                        <div class="symbol-container"><span class="run-anim">${syms[i]||'👤'}</span></div>
+                        <img src="${u.dp || 'https://via.placeholder.com/45'}" class="avatar">
+                        <div style="flex:1"><b>${u.name}</b><br><small>Rank #${i+1}</small></div>
+                        <b>₹${amt.toLocaleString()}</b>
+                    </div>`;
+                });
+                document.getElementById('ranking-list').innerHTML = h;
+            });
+            updateChart(cats);
+        }
+
+        function updateChart(cats) {
+            const ctx = document.getElementById('budgetChart').getContext('2d');
+            if(myChart) myChart.destroy();
+            myChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: { labels: Object.keys(cats), datasets: [{ data: Object.values(cats), backgroundColor: ['#4361ee','#f72585','#4cc9f0','#ff9f1c','#7209b7'] }] },
+                options: { maintainAspectRatio:false }
+            });
+        }
+
+        function saveExpense() {
+            const n = document.getElementById('exp-name').value, a = document.getElementById('exp-amount').value;
+            if(!n || !a) return;
+            db.ref('expenses').push({
+                itemName: n, amount: a, category: document.getElementById('exp-cat').value,
+                isPrivate: document.getElementById('exp-private').value === 'true',
+                familyId: userData.familyId, userId: currentUser.uid, userName: userData.name, timestamp: Date.now()
+            });
+            document.getElementById('exp-name').value=""; document.getElementById('exp-amount').value="";
+        }
+
+        function renderHistory(exps) {
+            let h = "";
+            const catIcons = { Grocery: '🛒', Bills: '⚡', Health: '💊', Travel: '🚗', Other: '📦' };
+            exps.slice().reverse().forEach(e => {
+                const isVisible = (!e.isPrivate) || (e.userId === currentUser.uid) || (e.buyerId === currentUser.uid);
+                const title = isVisible ? e.itemName : "Private Item 🔒";
+                const icon = isVisible ? (catIcons[e.category] || '📦') : '🔒';
+                h += `<div class="card history-item">
+                    <div><b>${icon} ${title}</b> ${e.isPrivate ? '<span class="private-badge">Private</span>':''}<br><small>${e.userName}</small></div>
+                    <b>₹${parseFloat(e.amount).toLocaleString()}</b>
+                </div>`;
+            });
+            document.getElementById('expense-history').innerHTML = h;
+        }
+
+        // --- TASKS ---
+        function addToTemp() {
+            const n = document.getElementById('t-name').value, q = document.getElementById('t-qty').value;
+            if(!n) return;
+            tempItems.push({ name: n, qty: q, isPrivate: document.getElementById('t-private').value==='true', bought: false });
+            document.getElementById('temp-items').innerHTML += `• ${n} (${q}) <br>`;
+            document.getElementById('t-name').value=""; document.getElementById('t-qty').value="";
+        }
+
+        function showUserSelection() {
+            const container = document.getElementById('select-user-list');
+            container.innerHTML = "";
+            db.ref('users').once('value', snap => {
+                Object.values(snap.val()).forEach(u => {
+                    if(u.familyId === userData.familyId && u.uid !== currentUser.uid) {
+                        container.innerHTML += `<div class="card" onclick="shareList('${u.uid}')" style="padding:10px; cursor:pointer; font-size:12px;">Send to ${u.name}</div>`;
+                    }
+                });
+            });
+            document.getElementById('user-selection').style.display = 'block';
+        }
+
+        function shareList(target) {
+            if(tempItems.length === 0) return;
+            db.ref('tasks').push({
+                familyId: userData.familyId, createdBy: userData.name, creatorId: currentUser.uid,
+                items: tempItems, assignedTo: target, acceptedBy: null, timestamp: Date.now()
+            });
+            closeListModal();
+        }
+
+        function closeListModal() {
+            tempItems = []; document.getElementById('temp-items').innerHTML=""; 
+            document.getElementById('user-selection').style.display='none';
+            document.getElementById('list-modal').style.display='none';
+        }
+
+        function renderTasks(ts) {
+            const container = document.getElementById('task-list-container');
+            container.innerHTML = "";
+            Object.entries(ts).reverse().forEach(([id, t]) => {
+                if(t.assignedTo !== 'all' && t.assignedTo !== currentUser.uid && t.creatorId !== currentUser.uid && t.acceptedBy !== currentUser.uid) return;
+
+                let h = `<div class="card"><small>By ${t.createdBy}</small>`;
+                if(t.assignedTo === 'all' && !t.acceptedBy && t.creatorId !== currentUser.uid) {
+                    h += `<button class="btn" style="padding:5px; margin:5px 0; font-size:12px;" onclick="acceptList('${id}')">Accept Task</button>`;
+                }
+
+                t.items.forEach((it, i) => {
+                    const isVisible = (!it.isPrivate) || (t.creatorId === currentUser.uid) || (t.acceptedBy === currentUser.uid) || (t.assignedTo === currentUser.uid);
+                    const title = isVisible ? it.name : "Private Item 🔒";
+                    h += `<div style="padding:10px 0; border-bottom:1px solid #eee; display:flex; gap:10px; align-items:center;">
+                        <input type="checkbox" style="width:18px; height:18px;" ${it.bought?'checked':''} onchange="buyItem('${id}', ${i}, this.checked)" ${(!t.acceptedBy && t.assignedTo==='all')?'disabled':''}>
+                        <span style="${it.bought?'text-decoration:line-through; opacity:0.5':''}">${title} (${it.qty})</span>
+                    </div>`;
+                });
+                container.innerHTML += h + `</div>`;
+            });
+        }
+
+        function acceptList(id) { db.ref(`tasks/${id}`).update({ acceptedBy: currentUser.uid, assignedTo: currentUser.uid }); }
+
+        async function buyItem(tid, idx, check) {
+            if(!check) return;
+            const snap = await db.ref(`tasks/${tid}`).once('value');
+            const it = snap.val().items[idx];
+            const pStr = prompt(`Price for 1kg/1L/1pcs of ${it.name}?`, "0");
+            const qStr = prompt(`Confirm Quantity:`, it.qty);
+            if(pStr && qStr) {
+                let p = parseFloat(pStr), num = parseFloat(qStr);
+                let unit = qStr.toLowerCase().replace(/[0-9.]/g, '').trim();
+                let total = (unit === 'g' || unit === 'gm' || unit === 'ml') ? (p * num / 1000) : (p * num);
+                db.ref('expenses').push({
+                    itemName: it.name + " (" + qStr + ")", amount: Math.round(total), category: 'Grocery',
+                    familyId: userData.familyId, userId: snap.val().creatorId, buyerId: currentUser.uid,
+                    userName: userData.name, isPrivate: it.isPrivate, timestamp: Date.now()
+                });
+                db.ref(`tasks/${tid}/items/${idx}`).update({ bought: true });
+            }
+        }
+
+        // --- FAMILY ---
+        function openFamilyModal() { document.getElementById('family-modal').style.display='flex'; loadMembers(); }
+        async function sendInvite() {
+            const code = document.getElementById('invite-code').value.toUpperCase();
+            const snap = await db.ref('users').orderByChild('familyCode').equalTo(code).once('value');
+            if(!snap.exists()) return alert("User not found");
+            const target = Object.values(snap.val())[0];
+            db.ref('requests/'+target.uid+'/'+currentUser.uid).set({ fromName: userData.name, fromId: currentUser.uid });
+            alert("Sent!");
+        }
+        function loadMembers() {
+            db.ref('requests/'+currentUser.uid).on('value', snap => {
+                let h = "";
+                Object.values(snap.val() || {}).forEach(r => {
+                    h += `<div class="card" style="display:flex; justify-content:space-between; padding:10px; font-size:12px;">
+                        <span>${r.fromName} Invited You</span>
+                        <button class="btn" style="width:auto; padding:2px 10px; background:var(--success);" onclick="acceptMember('${r.fromId}')">Join</button>
+                    </div>`;
+                });
+                document.getElementById('pending-invites').innerHTML = h;
+            });
+            db.ref('users').on('value', snap => {
+                let h = "";
+                Object.values(snap.val()||{}).forEach(u => {
+                    if(u.familyId === userData.familyId && u.uid !== currentUser.uid) {
+                        h += `<div class="card" style="display:flex; justify-content:space-between; align-items:center; padding:10px; font-size:12px;">
+                            <span>${u.name}</span>
+                            <button class="btn" style="width:auto; padding:2px 10px; background:var(--danger);" onclick="disconnect('${u.uid}')">Remove</button>
+                        </div>`;
+                    }
+                });
+                document.getElementById('connected-members').innerHTML = h;
+            });
+        }
+        async function acceptMember(id) { await db.ref('users/'+id).update({ familyId: userData.familyId }); await db.ref('requests/'+currentUser.uid+'/'+id).remove(); }
+        function disconnect(id) { db.ref('users/'+id).update({ familyId: id }); }
+
+        function exportPDF() { html2pdf().from(document.getElementById('pdf-content')).save('Family_Report.pdf'); }
+        function logout() { auth.signOut(); location.reload(); }
+    </script>
+</body>
+</html>
