@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Family Budget Pro Max V2</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    
+    <style>
+        :root {
+            --primary: #4361ee; --secondary: #3f37c9; --success: #4cc9f0; --danger: #f72585;
+            --bg: #f8f9fa; --card: #ffffff; --text: #2b2d42; --border: #eeeeee;
+        }
+        body.dark-mode {
+            --bg: #121212; --card: #1e1e1e; --text: #e0e0e0; --border: #333333;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Poppins', sans-serif; transition: 0.3s; }
+        body { background-color: var(--bg); color: var(--text); overflow: hidden; font-size: 14px; }
+        
+        /* Utility */
+        .view { display: none; height: calc(100vh - 65px); width: 100%; padding: 15px; overflow-y: auto; flex-direction: column; }
+        .view.active { display: flex; }
+        .card { background: var(--card); padding: 15px; border-radius: 20px; margin-bottom: 15px; border: 1px solid var(--border); box-shadow: 0 4px 10px rgba(0,0,0,0.03); }
+        .btn { background: var(--primary); color: white; border: none; padding: 10px; border-radius: 12px; cursor: pointer; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 8px; }
+        .input-group { margin-bottom: 12px; }
+        .input-group label { display: block; font-size: 12px; font-weight: 600; margin-bottom: 4px; }
+        .input-group input, .input-group select { width: 100%; padding: 10px; border-radius: 10px; border: 1px solid var(--border); background: var(--bg); color: var(--text); outline: none; }
+        
+        /* Navigation */
+        .bottom-nav { position: fixed; bottom: 0; width: 100%; height: 65px; background: var(--card); display: flex; justify-content: space-around; align-items: center; border-top: 1px solid var(--border); z-index: 1000; }
+        .nav-item { text-align: center; color: #8d99ae; font-size: 10px; cursor: pointer; }
+        .nav-item.active { color: var(--primary); }
+        .nav-item i { font-size: 18px; display: block; margin-bottom: 2px; }
+
+        /* Symbols & Ranking */
+        .rank-badge { width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; font-size: 20px; border-radius: 50%; background: #f0f2f5; position: relative; }
+        .symbol-anim { animation: bounce 2s infinite; }
+        @keyframes bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
+        
+        /* UI Lists */
+        .member-row { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+        .avatar { width: 45px; height: 45px; border-radius: 50%; object-fit: cover; background: #eee; }
+        
+        /* Modal */
+        .modal { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:4000; align-items:center; justify-content:center; }
+        
+        /* Checkbox & Privacy */
+        .private-tag { font-size: 10px; background: #ffe5ec; color: #f72585; padding: 2px 6px; border-radius: 4px; }
+    </style>
+</head>
+<body>
+
+    <div id="auth-screen" style="position:fixed; top:0; left:0; width:100%; height:100%; background:var(--bg); z-index:5000; display:flex; align-items:center; justify-content:center;">
+        <div class="card" style="width: 90%; max-width: 400px; text-align: center;">
+            <h2 style="color:var(--primary);">Family Budget</h2>
+            <div id="signup-fields" style="display:none;">
+                <div class="input-group"><label>Full Name</label><input type="text" id="reg-name"></div>
+                <div class="input-group"><label>Avatar URL</label><input type="text" id="reg-dp" placeholder="https://..."></div>
+            </div>
+            <div class="input-group"><label>Phone</label><input type="text" id="auth-phone"></div>
+            <div class="input-group"><label>Password</label><input type="password" id="auth-pass"></div>
+            <button class="btn" style="width:100%" onclick="handleAuth()">Submit</button>
+            <p style="margin-top:15px; font-size:12px; color:var(--primary); cursor:pointer" onclick="toggleAuthMode()" id="auth-link">Create Account</p>
+        </div>
+    </div>
+
+    <div id="view-dashboard" class="view active">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+            <h3>Home Dashboard</h3>
+            <div style="display: flex; gap: 15px; align-items: center;">
+                <i class="fas fa-users" style="font-size: 20px; color: var(--primary); cursor: pointer;" onclick="openFamilyModal()"></i>
+                <i class="fas fa-moon" id="dark-icon" style="font-size: 20px; cursor: pointer;" onclick="toggleDarkMode()"></i>
+            </div>
+        </div>
+
+        <div class="card" style="background: linear-gradient(135deg, var(--primary), var(--secondary)); color: white;">
+            <small>Family Total Spend</small>
+            <h1 id="total-monthly-spend">₹ 0</h1>
+            <div id="budget-progress" style="width:100%; height:8px; background:rgba(255,255,255,0.2); border-radius:5px; margin: 10px 0;"><div id="budget-fill" style="height:100%; width:0%; background:#fff;"></div></div>
+        </div>
+
+        <h4>Top Spenders (Rankings)</h4>
+        <div id="ranking-list"></div>
+
+        <div class="card" style="margin-top: 15px;"><canvas id="budgetChart" height="200"></canvas></div>
+    </div>
+
+    <div id="view-entry" class="view">
+        <h3>💸 New Entry & History</h3>
+        <div class="card">
+            <div class="input-group"><label>Item Name</label><input type="text" id="exp-name"></div>
+            <div class="input-group"><label>Amount (₹)</label><input type="number" id="exp-amount"></div>
+            <div style="display:flex; gap:10px;">
+                <div class="input-group" style="flex:1;"><label>Category</label>
+                    <select id="exp-cat"><option>Grocery</option><option>Bills</option><option>Health</option><option>Other</option></select>
+                </div>
+                <div class="input-group" style="flex:1;"><label>Private?</label>
+                    <select id="exp-private"><option value="false">Public</option><option value="true">Private</option></select>
+                </div>
+            </div>
+            <button class="btn" style="width:100%" onclick="saveExpense()">Save Entry</button>
+        </div>
+        <h4>Expense History</h4>
+        <div id="expense-history" style="margin-top:10px;"></div>
+    </div>
+
+    <div id="view-tasks" class="view">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+            <h3>📋 Shopping Lists</h3>
+            <button onclick="showCreateList()" class="btn" style="padding: 5px 12px;">+ Create</button>
+        </div>
+        <div id="task-list-container" style="margin-top:10px;"></div>
+        <hr style="margin:15px 0; opacity:0.1">
+        <h4>Today's Log</h4>
+        <div id="task-history-log"></div>
+    </div>
+
+    <div id="view-profile" class="view">
+        <h3>👤 My Profile</h3>
+        <div class="card" style="text-align: center;">
+            <img id="prof-img" src="" class="avatar" style="width:80px; height:80px; margin-bottom:10px;">
+            <div class="input-group"><label>Name</label><input type="text" id="edit-name"></div>
+            <div class="input-group"><label>Avatar URL</label><input type="text" id="edit-dp"></div>
+            <button class="btn" style="width:100%" onclick="updateProfile()">Update Profile</button>
+            <hr style="margin:15px 0;">
+            <p style="font-size:12px; color:gray">Your Family Code: <b id="prof-code" style="color:var(--primary)"></b></p>
+            <button class="btn" style="background:var(--danger); width:100%; margin-top:20px;" onclick="logout()">Logout</button>
+        </div>
+    </div>
+
+    <div id="family-modal" class="modal">
+        <div class="card" style="width:95%; max-width:450px; max-height:85vh; overflow-y:auto;">
+            <div style="display:flex; justify-content:space-between;">
+                <h4>Family Connections</h4>
+                <i class="fas fa-times" onclick="document.getElementById('family-modal').style.display='none'"></i>
+            </div>
+            <br>
+            <div class="input-group">
+                <label>Send Request (Enter Member Code)</label>
+                <div style="display:flex; gap:5px;">
+                    <input type="text" id="target-code" style="flex:1">
+                    <button class="btn" onclick="sendRequest()">Send</button>
+                </div>
+            </div>
+            <h5>Pending Requests</h5>
+            <div id="pending-requests"></div>
+            <br>
+            <h5>Connected Members</h5>
+            <div id="connected-members"></div>
+        </div>
+    </div>
+
+    <div id="list-modal" class="modal">
+        <div class="card" style="width:90%; max-width:400px;">
+            <h4>Create List</h4>
+            <div id="temp-items-list" style="margin:10px 0;"></div>
+            <div class="input-group"><input type="text" id="t-item" placeholder="Item Name"></div>
+            <div class="input-group"><input type="text" id="t-qty" placeholder="Qty (e.g. 2kg)"></div>
+            <div class="input-group">
+                <label>Private Item?</label>
+                <select id="t-private"><option value="false">Public</option><option value="true">Private</option></select>
+            </div>
+            <div style="display:flex; gap:5px;">
+                <button class="btn" style="flex:1; background:#6c757d" onclick="addToList()">+ Add</button>
+                <button class="btn" style="flex:1" onclick="submitList()">Send</button>
+            </div>
+            <button class="btn" style="width:100%; background:transparent; color:gray" onclick="document.getElementById('list-modal').style.display='none'">Cancel</button>
+        </div>
+    </div>
+
+    <nav class="bottom-nav">
+        <div class="nav-item active" onclick="switchView('dashboard', this)"><i class="fas fa-home"></i>Home</div>
+        <div class="nav-item" onclick="switchView('entry', this)"><i class="fas fa-history"></i>Entry</div>
+        <div class="nav-item" onclick="switchView('tasks', this)"><i class="fas fa-shopping-cart"></i>Lists</div>
+        <div class="nav-item" onclick="switchView('profile', this)"><i class="fas fa-user"></i>Profile</div>
+    </nav>
+
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyCikJiVhp8kq5iSzyktKip-19TDBth2BLg",
+            authDomain: "familybudgetapp-7cd6f.firebaseapp.com",
+            projectId: "familybudgetapp-7cd6f",
+            storageBucket: "familybudgetapp-7cd6f.firebasestorage.app",
+            messagingSenderId: "716849659548",
+            appId: "1:716849659548:web:915bf1de4669b386ea3759",
+            databaseURL: "https://familybudgetapp-7cd6f-default-rtdb.firebaseio.com"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth(), db = firebase.database();
+        let currentUser = null, userData = {}, isSignUp = false, myChart = null, tempShoppingList = [];
+
+        // 1. AUTH FUNCTIONS
+        function toggleAuthMode() { isSignUp = !isSignUp; document.getElementById('signup-fields').style.display = isSignUp ? 'block' : 'none'; }
+        async function handleAuth() {
+            const p = document.getElementById('auth-phone').value, ps = document.getElementById('auth-pass').value;
+            const e = p + "@family.com";
+            try {
+                if(isSignUp) {
+                    const res = await auth.createUserWithEmailAndPassword(e, ps);
+                    const code = Math.random().toString(36).substring(2,8).toUpperCase();
+                    await db.ref('users/'+res.user.uid).set({ uid:res.user.uid, name:document.getElementById('reg-name').value, phone:p, familyId:res.user.uid, familyCode:code, dp:document.getElementById('reg-dp').value || 'https://via.placeholder.com/150' });
+                } else await auth.signInWithEmailAndPassword(e, ps);
+            } catch(err) { alert(err.message); }
+        }
+        auth.onAuthStateChanged(user => { if(user) { currentUser=user; document.getElementById('auth-screen').style.display='none'; init(); } else document.getElementById('auth-screen').style.display='flex'; });
+        function logout() { auth.signOut(); location.reload(); }
+
+        // 2. CORE INIT
+        function init() {
+            db.ref('users/'+currentUser.uid).on('value', snap => {
+                userData = snap.val(); if(!userData) return;
+                document.getElementById('prof-img').src = userData.dp;
+                document.getElementById('edit-name').value = userData.name;
+                document.getElementById('edit-dp').value = userData.dp;
+                document.getElementById('prof-code').innerText = userData.familyCode;
+                sync();
+            });
+        }
+
+        // 3. FAMILY SYNC & REQUESTS
+        function openFamilyModal() { document.getElementById('family-modal').style.display='flex'; loadFamilyUI(); }
+        async function sendRequest() {
+            const code = document.getElementById('target-code').value.toUpperCase();
+            const snap = await db.ref('users').orderByChild('familyCode').equalTo(code).once('value');
+            if(!snap.exists()) return alert("User not found");
+            const target = Object.values(snap.val())[0];
+            db.ref('requests/'+target.uid+'/'+currentUser.uid).set({ fromName: userData.name, fromDp: userData.dp, fromId: currentUser.uid, status: 'pending' });
+            alert("Request Sent");
+        }
+        function loadFamilyUI() {
+            db.ref('requests/'+currentUser.uid).on('value', snap => {
+                const reqs = snap.val() || {};
+                let h = "";
+                Object.values(reqs).forEach(r => {
+                    h += `<div class="member-row"><img src="${r.fromDp}" class="avatar"><div><b>${r.fromName}</b></div>
+                        <button class="btn" style="padding:2px 10px; background:var(--success)" onclick="acceptReq('${r.fromId}')">Accept</button></div>`;
+                });
+                document.getElementById('pending-requests').innerHTML = h || "No pending requests";
+            });
+            db.ref('users').on('value', snap => {
+                const all = snap.val() || {};
+                let h = "";
+                Object.values(all).forEach(u => {
+                    if(u.familyId === userData.familyId && u.uid !== currentUser.uid) {
+                        h += `<div class="member-row"><img src="${u.dp}" class="avatar"><div><b>${u.name}</b><br><small>${u.familyCode}</small></div>
+                            <button class="btn" style="padding:2px 10px; background:var(--danger); margin-left:auto" onclick="disconnectMember('${u.uid}')">Remove</button></div>`;
+                    }
+                });
+                document.getElementById('connected-members').innerHTML = h || "No members connected";
+            });
+        }
+        async function acceptReq(fromId) {
+            await db.ref('users/'+fromId).update({ familyId: userData.familyId });
+            await db.ref('requests/'+currentUser.uid+'/'+fromId).remove();
+        }
+        function disconnectMember(uid) { if(confirm("Disconnect this member?")) db.ref('users/'+uid).update({ familyId: uid }); }
+
+        // 4. SYNC DATA
+        function sync() {
+            db.ref('expenses').orderByChild('familyId').equalTo(userData.familyId).on('value', snap => {
+                const data = Object.values(snap.val() || {});
+                processRankingAndDashboard(data);
+                renderHistory(data);
+            });
+            db.ref('tasks').orderByChild('familyId').equalTo(userData.familyId).on('value', snap => renderTasks(snap.val() || {}));
+        }
+
+        // 5. RANKING & DASHBOARD (gamification)
+        function processRankingAndDashboard(exps) {
+            let total = 0; const userSpends = {}; const cats = {};
+            exps.forEach(e => {
+                const amt = parseFloat(e.amount);
+                total += amt;
+                userSpends[e.userId] = (userSpends[e.userId] || 0) + amt;
+                const catName = (e.isPrivate && e.userId !== currentUser.uid) ? "Private Item" : e.category;
+                cats[catName] = (cats[catName] || 0) + amt;
+            });
+
+            document.getElementById('total-monthly-spend').innerText = "₹ " + total.toLocaleString();
+            
+            // Ranking List
+            db.ref('users').once('value', uSnap => {
+                const allUsers = uSnap.val();
+                const sorted = Object.entries(userSpends).sort((a,b) => b[1] - a[1]);
+                let h = "";
+                const icons = ['bull', 'house-chimney', 'dragon', 'otter']; // Bull, House, Lion, Bear symbols
+                const symbols = ['🐂', '🏠', '🦁', '🐻'];
+                
+                sorted.forEach(([uid, amt], idx) => {
+                    const u = allUsers[uid] || {name: 'Unknown', dp: ''};
+                    const sym = symbols[idx] || '👤';
+                    h += `<div class="card member-row" style="margin-bottom:8px">
+                        <div class="rank-badge ${idx < 4 ? 'symbol-anim' : ''}">${sym}</div>
+                        <img src="${u.dp}" class="avatar">
+                        <div style="flex:1"><b>${u.name}</b><br><small>Rank #${idx+1}</small></div>
+                        <b>₹${amt}</b>
+                    </div>`;
+                });
+                document.getElementById('ranking-list').innerHTML = h;
+            });
+            updateChart(cats);
+        }
+
+        function updateChart(cats) {
+            const ctx = document.getElementById('budgetChart').getContext('2d');
+            if(myChart) myChart.destroy();
+            myChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: { labels: Object.keys(cats), datasets: [{ data: Object.values(cats), backgroundColor: ['#4361ee','#f72585','#4cc9f0','#ff9f1c','#7209b7','#2ec4b6'] }] },
+                options: { maintainAspectRatio:false, plugins: { legend: { labels: { color: getComputedStyle(document.body).getPropertyValue('--text') } } } }
+            });
+        }
+
+        // 6. EXPENSES & PRIVATE LOGIC
+        function saveExpense() {
+            const n = document.getElementById('exp-name').value, a = document.getElementById('exp-amount').value;
+            if(!n || !a) return;
+            db.ref('expenses').push({
+                itemName: n, amount: a, category: document.getElementById('exp-cat').value,
+                isPrivate: document.getElementById('exp-private').value === 'true',
+                familyId: userData.familyId, userId: currentUser.uid, userName: userData.name, timestamp: Date.now()
+            });
+            document.getElementById('exp-name').value=""; document.getElementById('exp-amount').value="";
+        }
+
+        function renderHistory(exps) {
+            let h = "";
+            exps.slice().reverse().forEach(e => {
+                const isMyPrivate = e.isPrivate && e.userId === currentUser.uid;
+                const isOthersPrivate = e.isPrivate && e.userId !== currentUser.uid;
+                const displayTitle = isOthersPrivate ? "Private Purchase" : e.itemName;
+                h += `<div class="card member-row">
+                    <div style="flex:1"><b>${displayTitle}</b> ${e.isPrivate ? '<span class="private-tag">Private</span>':''}<br>
+                    <small>${e.userName} • ${new Date(e.timestamp).toLocaleDateString()}</small></div>
+                    <b>₹${e.amount}</b>
+                </div>`;
+            });
+            document.getElementById('expense-history').innerHTML = h;
+        }
+
+        // 7. LISTS (Qty Edit & Per Qty Amount)
+        function showCreateList() { tempShoppingList = []; document.getElementById('temp-items-list').innerHTML=""; document.getElementById('list-modal').style.display='flex'; }
+        function addToList() {
+            const n = document.getElementById('t-item').value, q = document.getElementById('t-qty').value;
+            if(!n) return;
+            tempShoppingList.push({ name: n, qty: q, isPrivate: document.getElementById('t-private').value === 'true', bought: false });
+            document.getElementById('temp-items-list').innerHTML += `<div style="font-size:12px;">• ${n} (${q})</div>`;
+            document.getElementById('t-item').value=""; document.getElementById('t-qty').value="";
+        }
+        function submitList() {
+            db.ref('tasks').push({ familyId: userData.familyId, createdBy: userData.name, creatorId: currentUser.uid, items: tempShoppingList, timestamp: Date.now() });
+            document.getElementById('list-modal').style.display='none';
+        }
+
+        function renderTasks(ts) {
+            const container = document.getElementById('task-list-container');
+            const log = document.getElementById('task-history-log');
+            container.innerHTML = ""; log.innerHTML = "";
+            
+            Object.entries(ts).reverse().forEach(([id, t]) => {
+                let h = `<div class="card"><small>${t.createdBy}</small>`;
+                t.items.forEach((it, i) => {
+                    const hdn = it.isPrivate && (t.creatorId !== currentUser.uid && !it.assignedTo); 
+                    const title = hdn ? "Private Item" : it.name;
+                    h += `<div style="padding:8px 0; border-bottom:1px solid #eee">
+                        <input type="checkbox" ${it.bought?'checked':''} onchange="openBuyModal('${id}', ${i}, this.checked)"> 
+                        <span style="${it.bought?'text-decoration:line-through':''}">${title} (${it.qty})</span>
+                    </div>`;
+                });
+                h += `</div>`;
+                container.innerHTML += h;
+            });
+        }
+
+        function openBuyModal(tid, idx, checked) {
+            if(!checked) return db.ref(`tasks/${tid}/items/${idx}`).update({ bought: false });
+            const price = prompt("Per Quantity Price?");
+            const newQty = prompt("Change Quantity? (Cancel to keep original)");
+            if(price) {
+                db.ref(`tasks/${tid}/items/${idx}`).update({ bought: true, finalPrice: price, finalQty: newQty || '?' });
+                processTaskToExpense(tid, idx);
+            }
+        }
+
+        async function processTaskToExpense(tid, idx) {
+            const snap = await db.ref(`tasks/${tid}`).once('value');
+            const task = snap.val();
+            const it = task.items[idx];
+            const total = parseFloat(it.finalPrice) * (parseFloat(it.finalQty) || 1);
+            db.ref('expenses').push({
+                itemName: it.name, amount: total, category: 'Grocery',
+                familyId: task.familyId, userId: currentUser.uid, userName: userData.name,
+                isPrivate: it.isPrivate, timestamp: Date.now()
+            });
+        }
+
+        // 8. PROFILE & UTILS
+        function updateProfile() {
+            db.ref('users/'+currentUser.uid).update({ name: document.getElementById('edit-name').value, dp: document.getElementById('edit-dp').value });
+            alert("Updated!");
+        }
+        function toggleDarkMode() { document.body.classList.toggle('dark-mode'); }
+        function switchView(id, el) {
+            document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+            document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+            document.getElementById('view-'+id).classList.add('active'); el.classList.add('active');
+        }
+    </script>
+</body>
+</html>
